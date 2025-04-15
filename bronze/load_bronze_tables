@@ -1,0 +1,141 @@
+/*
+=====================================================================
+Stored Procedure: Load Bronze Layer (Azure Blob Storage -> Bronze)
+=====================================================================
+Script Purpose:
+
+  The stored procedure loads data in to the bronze schema from external CSV files.
+  It:
+  - Creates Aure stage by giving access to an Azure blob storage account via authentification key
+  - Truncates the bronze tables 
+  - Uses the 'COPY INTO' command to load data from csv files from Azure blob storage
+
+Parameters:
+  None.
+This stored procedure does not accept any parameters or return any values
+
+Prerequsites:
+  Prior to using this script you must 
+    1 . Set up an Azure storage account
+    2. Upload the data to blob storage
+    3. Generate a shared access signature (SAS) token to grant Snowflake limited access to objects in your storage account. 
+    4. You can then access an external (Azure) stage that references the container and replace the URL and SAS token with relevant ones. 
+
+Usage Example: 
+  CALL bronze.load_bronze;
+======================================================================
+*/
+---> set Role Context
+--USE ROLE accountadmin;
+
+---> set Warehouse Context
+--USE WAREHOUSE compute_wh;
+
+
+
+CREATE OR REPLACE PROCEDURE bronze.load_bronze()
+RETURNS VARCHAR
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  start_time TIMESTAMP_LTZ;
+  end_time TIMESTAMP_LTZ;
+BEGIN
+    
+
+
+    ---> Create the Microsoft Azure Stage
+    -- Creating an Azure Stage: https://docs.snowflake.com/en/user-guide/data-load-azure-create-stage
+
+    CREATE OR REPLACE STAGE my_azure_stage
+      URL= 'azure://a36ec.blob.core.windows.net/input'
+      CREDENTIALS=(AZURE_SAS_TOKEN='sp=r&st=2025-04-15T09:23:15Z&se=2025-04-15T17:23:15Z&spr=https&sv=2024-11-04&sr=c&sig=kP221kKEB1qm%2FWnVu4JU99fnT62mccY3ybX1e6EdPCQ%3D');
+- -Replace with own URL ad credentials
+        
+
+     TRUNCATE TABLE bronze.crm_cust_info;
+     -- This clears the table. Must be done otherwise table could be filled twice.
+
+    ---> Load data from the Azure Stage into the Table
+    -- Copying Data from an Azure Stage: https://docs.snowflake.com/en/user-guide/data-load-azure-copy
+    -- COPY INTO <table>: https://docs.snowflake.com/en/sql-reference/sql/copy-into-table
+
+    COPY INTO commerce.bronze.crm_cust_info
+    FROM @my_azure_stage
+    FILES = ( 'cust_info.csv' ) 
+    FILE_FORMAT = ( TYPE = CSV
+    FIELD_DELIMITER = ','  -- Specify your delimiter
+    SKIP_HEADER = 1 );
+
+    TRUNCATE TABLE bronze.crm_prd_info;
+    
+    SYSTEM$LOG('INFO', '>> Inserting Data Into: bronze.crm_prd_info');
+    -- BULK INSERT is not a standard Snowflake command. Use COPY INTO.
+
+    
+    COPY INTO bronze.crm_prd_info
+    FROM @my_azure_stage
+    FILES = ( 'prd_info.csv' )
+    FILE_FORMAT = (TYPE = CSV, SKIP_HEADER = 1, FIELD_DELIMITER = ',');
+    
+    SYSTEM$LOG('INFO', '>> Truncating Table: bronze.crm_sales_details');
+    
+    TRUNCATE TABLE bronze.crm_sales_details;
+    
+    SYSTEM$LOG('INFO', '>> Inserting Data Into: bronze.crm_sales_details');
+   
+    COPY INTO COMMERCE.BRONZE.CRM_SALES_DETAILS
+    FROM @my_azure_stage
+    FILES = ( 'sales_details.csv' ) 
+    FILE_FORMAT = (TYPE = CSV, SKIP_HEADER = 1, FIELD_DELIMITER = ',');
+
+    SYSTEM$LOG('INFO', '>> Truncating Table: bronze.erp_cust_az12');
+    
+    TRUNCATE TABLE bronze.erp_cust_az12;
+    
+    SYSTEM$LOG('INFO', '>> Inserting Data Into: bronze.erp_cust_az12');
+    
+    COPY INTO COMMERCE.BRONZE.ERP_CUST_AZ12
+    FROM @my_azure_stage
+    FILES = ( 'CUST_AZ12.csv' )
+    FILE_FORMAT = (TYPE = CSV, SKIP_HEADER = 1, FIELD_DELIMITER = ',');
+
+    SYSTEM$LOG('INFO', '>> Truncating Table: bronze.erp_loc_A101');
+    
+    TRUNCATE TABLE bronze.erp_loc_A101;
+
+    SYSTEM$LOG('INFO', '>> Inserting Data Into: bronze.erp_loc_A101');
+
+    COPY INTO bronze.erp_loc_A101
+    FROM @my_azure_stage
+    FILES = ( 'LOC_A101.csv' )
+    FILE_FORMAT = (TYPE = CSV, SKIP_HEADER = 1, FIELD_DELIMITER = ',');
+
+    SYSTEM$LOG('INFO', '>> Truncating Table: bronze.erp_px_cat_g1v2');
+    
+    TRUNCATE TABLE bronze.erp_px_cat_g1v2;
+
+    SYSTEM$LOG('INFO', '>> Inserting Data Into: bronze.erp_px_cat_g1v2');
+    COPY INTO bronze.erp_px_cat_g1v2
+    FROM @my_azure_stage
+    FILES = ( 'PX_CAT_G1V2.csv' )
+    FILE_FORMAT = (TYPE = CSV, SKIP_HEADER = 1, FIELD_DELIMITER = ',');
+
+    RETURN 'Bronze Layer loading process completed.';
+
+  EXCEPTION
+    WHEN OTHER THEN
+      LET error_message := SQLERRM;
+      SYSTEM$LOG('ERROR', '=========================================');
+      SYSTEM$LOG('ERROR', 'ERROR OCCURED DURING LOADING BRONZE LAYER');
+      SYSTEM$LOG('ERROR', 'ERROR MESSAGE: ' || error_message);
+      SYSTEM$LOG('ERROR', 'ERROR NUMBER: ' || SQLCODE); -- Use SQLCODE for error number
+      SYSTEM$LOG('ERROR', '=========================================');
+      RETURN 'Error loading Bronze Layer: ' || error_message;
+
+END;
+$$;
+
+
+
