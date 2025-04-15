@@ -49,8 +49,8 @@ BEGIN
     -- Creating an Azure Stage: https://docs.snowflake.com/en/user-guide/data-load-azure-create-stage
 
     CREATE OR REPLACE STAGE my_azure_stage
-      URL= 'azure://a36ec.blob.core.windows.net/input'
-      CREDENTIALS=(AZURE_SAS_TOKEN='sp=r&st=2025-04-15T09:23:15Z&se=2025-04-15T17:23:15Z&spr=https&sv=2024-11-04&sr=c&sig=kP221kKEB1qm%2FWnVu4JU99fnT62mccY3ybX1e6EdPCQ%3D');
+      URL= 'azure://[username].account' -- Add account url here 
+      CREDENTIALS=(AZURE_SAS_TOKEN=''); -- Add SAS token here 
 - -Replace with own URL ad credentials
         
 
