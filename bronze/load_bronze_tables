@@ -16,10 +16,10 @@ This stored procedure does not accept any parameters or return any values
 
 Prerequsites:
   Prior to using this script you must 
-    1 . Set up an Azure storage account
+    1. Set up an Azure storage account
     2. Upload the data to blob storage
     3. Generate a shared access signature (SAS) token to grant Snowflake limited access to objects in your storage account. 
-    4. You can then access an external (Azure) stage that references the container and replace the URL and SAS token with relevant ones. 
+    4. You can then access an external (Azure) stage that references the container by replacing the URL and SAS token with relevant ones. 
 
 Usage Example: 
   CALL bronze.load_bronze;
@@ -51,7 +51,7 @@ BEGIN
     CREATE OR REPLACE STAGE my_azure_stage
       URL= 'azure://[username].account' -- Add account url here 
       CREDENTIALS=(AZURE_SAS_TOKEN=''); -- Add SAS token here 
-- -Replace with own URL ad credentials
+    -- Replace with own URL ad credentials
         
 
      TRUNCATE TABLE bronze.crm_cust_info;
